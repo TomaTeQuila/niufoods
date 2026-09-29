@@ -81,11 +81,9 @@ Los payloads, las respuestas, las instrucciones de instalación y los comandos d
 
 ## Comandos de desarrollo
 
-Los comandos finales se documentarán una vez creadas la aplicación y la configuración de Docker Compose.
 
 ## Reglas del proyecto
 
-- El código de la aplicación no incluirá comentarios.
 - Los totales se calculan en el servidor utilizando los precios de productos almacenados en PostgreSQL.
 - Los precios de los ítems se guardan como snapshots históricos.
 - Las solicitudes duplicadas que utilicen la misma clave de idempotencia no deben crear órdenes duplicadas.

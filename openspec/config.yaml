@@ -1,0 +1,69 @@
+schema: spec-driven
+
+context: |
+  Project: Niufoods order management application.
+  Current stack: Ruby 4.0.7, Rails 8.1.4, SQLite skeleton, Importmap, Turbo, Stimulus.
+  Target architecture: modular Rails monolith with PostgreSQL, React, Redis, and Sidekiq.
+  Current repository state: Rails skeleton plus architecture documentation; application features are not implemented.
+  Repository convention: technical artifacts are written in English unless explicitly requested otherwise.
+
+strict_tdd: true
+
+projects:
+  - path: "."
+    stack: "Ruby 4.0.7 / Rails 8.1.4"
+    test_command: "bin/rails test"
+    workspace_command: "bin/ci"
+    framework: "Minitest"
+    test_layers:
+      unit: true
+      integration: true
+      system: true
+    coverage_command: null
+    quality:
+      linter: "bin/rubocop"
+      type_checker: null
+      formatter: "bin/rubocop"
+
+testing:
+  strict_tdd: true
+  workspace_command: "bin/ci"
+  projects:
+    - path: "."
+      stack: "Ruby 4.0.7 / Rails 8.1.4"
+      test_command: "bin/rails test"
+      framework: "Minitest"
+      test_layers:
+        unit: true
+        integration: true
+        system: true
+      coverage_command: null
+      quality:
+        linter: "bin/rubocop"
+        type_checker: null
+        formatter: "bin/rubocop"
+
+rules:
+  proposal:
+    - Include rollback plans for risky changes.
+  specs:
+    - Use Given/When/Then scenarios.
+    - Use RFC 2119 keywords where normative behavior is specified.
+  design:
+    - Include sequence diagrams for complex flows.
+    - Document architecture decisions with rationale.
+  tasks:
+    - Group tasks by implementation phase.
+    - Keep tasks completable in one focused session.
+  apply:
+    guidelines:
+      - Follow existing Rails conventions unless the approved design states otherwise.
+      - Do not add comments to application code.
+    tdd: true
+    test_command: "bin/rails test"
+  verify:
+    test_command: "bin/ci"
+    build_command: null
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas.
