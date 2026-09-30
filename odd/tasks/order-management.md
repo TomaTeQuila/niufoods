@@ -71,16 +71,16 @@ The Rails repository is currently a skeleton: it has no PostgreSQL application s
 
 ### OM-03 — Implement Restaurant and Product JSON APIs
 
-- [ ] Add versioned JSON collection/show/create/full-replacement-update/logical-delete endpoints for restaurants and products.
-- [ ] Require Restaurant create `name` and `code`; require Product create `name`, `sku`, and integer `price_clp`. Require every editable PUT field (Restaurant: `name`, `code`, `dispatch_url`, `active`; Product: `name`, `sku`, `price_clp`, `active`); preserve route identity and reject incomplete replacements without mutation.
-- [ ] Soft-delete with `deleted_at`; hide deleted resources from collection and show; return 404 for deleted/nonexistent show; treat Restaurant/Product `active` as independent availability, not deletion.
-- [ ] Add request tests for success, validation failures/no persistence mutation, full PUT, delete retention/visibility, and JSON responses.
+- [x] Add versioned JSON collection/show/create/full-replacement-update/logical-delete endpoints for restaurants and products.
+- [x] Require Restaurant create `name` and `code`; require Product create `name`, `sku`, and integer `price_clp`. Require every editable PUT field (Restaurant: `name`, `code`, `dispatch_url`, `active`; Product: `name`, `sku`, `price_clp`, `active`); preserve route identity and reject incomplete replacements without mutation.
+- [x] Soft-delete with `deleted_at`; hide deleted resources from collection and show; return 404 for deleted/nonexistent show; treat Restaurant/Product `active` as independent availability, not deletion.
+- [x] Add request tests for success, validation failures/no persistence mutation, full PUT, delete retention/visibility, and JSON responses.
 - Route: **delegated direct**. Trigger evidence: controllers/routes/serialization/models/request tests are multiple non-trivial files, and code-reading prepares the write.
 - Acceptance: only specified HTTP methods are exposed; PUT fully replaces editable fields; DELETE retains the database row and updates `deleted_at`; deleted rows do not appear in GET; `active: false` alone does not imply deletion.
 - Checks: strict TDD; focused API request tests; `bin/rails test`.
 - Runtime harness: run Rails against PostgreSQL and exercise representative Restaurant and Product create/read/update/delete requests; record exact command/scenario/result.
 - Commit evidence: user-owned; report changed files and verification, but do not commit.
-- Status: not started.
+- Status: complete (uncommitted; user owns commit/PR). Strict TDD: RED: the focused request tests failed (4 runs, 8 assertions, 4 failures) because the API routes did not exist. GREEN: after adding the API implementation, the focused suite passed (4 runs, 38 assertions); expanded cases for route identity, inactive-but-not-deleted resources, and JSON numeric price validation passed (4 runs, 40 assertions). REFACTOR: replacement and response field sets were centralized as controller constants; focused suite remained green (4 runs, 40 assertions). Full suite passed (9 runs, 62 assertions). PostgreSQL smoke evidence: `bin/rails runner -e test 'puts ActiveRecord::Base.connection.adapter_name'` reported `PostgreSQL`; focused integration request tests exercised Restaurant and Product create/read/update/delete against that test database. Route inventory confirms only GET/POST/PUT/DELETE for these resources, with no PATCH.
 
 ### OM-04 — Implement order query/create/logical-delete, price snapshots, and idempotency
 
@@ -107,6 +107,17 @@ The Rails repository is currently a skeleton: it has no PostgreSQL application s
 - Commit evidence: user-owned; report changed files and verification, but do not commit.
 - Status: not started.
 
+### OM-06 — Seed the supplied restaurant and product catalog
+
+- [x] Add idempotent, convergent Rails seeds for the three supplied Restaurants and ten supplied Products, keyed by `code` and `sku`; set supplied IDs only when available without overwriting unrelated records, and ensure the PostgreSQL ID sequences remain valid.
+- [x] Add focused Minitest coverage proving initial creation and rerun convergence, including `active: true` and `deleted_at: nil` for matching master records.
+- [x] Inspect the local development database before mutation; stop if any requested explicit ID belongs to a different record. Preserve unrelated rows and seed only the development database with `bin/rails db:seed`.
+- Route: **delegated direct**. Trigger evidence: behavior and focused test require coordinated changes to seed code and tests; project test execution is delegated.
+- Acceptance: all supplied field values and safe requested IDs are present; repeated seed runs converge without duplicate keyed records or changing unrelated records; test and development environments remain distinct.
+- Checks: strict TDD; focused seeds test RED/GREEN/REFACTOR; full `bin/rails test`; inspect existing development rows before `bin/rails db:seed`, then query back exact rows/IDs.
+- Commit evidence: user-owned; do not commit, push, or open a PR.
+- Status: complete (uncommitted; user owns commit/PR). RED: focused seeds test failed (1 run, 1 assertion) because seed loading created no catalog rows. GREEN: focused suite passed (2 runs, 17 assertions); full test suite passed (11 runs, 79 assertions). Development database was empty before seeding; `bin/rails db:seed` created the requested 3 restaurants and 10 products in `niufoods_development`; exact readback passed, with ID sequences at 3 and 10. Collision behavior and rerun convergence are covered by the focused test.
+
 ## Progress and Evidence
 
 - Completed exploration: confirmed Rails 8.1.4/Ruby 4.0.7 skeleton, SQLite configuration, empty application route/domain surface, Minitest/fixtures, and configured `bin/ci` checks.
@@ -115,14 +126,15 @@ The Rails repository is currently a skeleton: it has no PostgreSQL application s
 - Completed implementation/check work awaiting user commit: OM-01 documentation only.
 - OM-02 implementation verified against local PostgreSQL 14. `PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test`: 5 runs, 22 assertions, 0 failures, 0 errors, 0 skips (including parent spot-check). `bin/rails db:create db:migrate RAILS_ENV=test` succeeded; development migration is up.
 - Shell default Ruby was 2.6; Rails checks require selecting project Ruby 4.0.7 on `PATH`.
-- Pending: OM-03 and OM-04 APIs, OM-05 full checks/docs. Formal native review could not yet scope the candidate cleanly because unrelated existing diagram modification is in the tracked diff and untracked selection was requested; do not absorb or edit the diagram.
-- Running authored changed-line count: implementation underway; not yet measured.
+- OM-03 API implementation and request verification are complete; pending OM-04 APIs and OM-05 full checks/docs. Formal native review could not yet scope the candidate cleanly because unrelated existing diagram modification is in the tracked diff and untracked selection was requested; do not absorb or edit the diagram.
+- OM-03 changed files: `config/routes.rb`, `app/controllers/api/v1/restaurants_controller.rb`, `app/controllers/api/v1/products_controller.rb`, `test/integration/api_v1_catalog_test.rb`. `git diff --check` passed; generated log/cache changes from test runs were discarded.
+- OM-06 added `db/seeds.rb` and `test/integration/seeds_test.rb`. Focused seeds verification: 2 runs, 17 assertions, 0 failures/errors/skips; full `bin/rails test`: 11 runs, 79 assertions, 0 failures/errors/skips. Development DB inspection before mutation showed no Restaurants or Products; `bin/rails db:seed` targeted `niufoods_development` and completed; exact readback verified supplied IDs, names, codes/SKUs, integer CLP prices, `active=true`, `deleted_at=nil`, and nil Restaurant `dispatch_url`. PostgreSQL sequences read back at 3 (restaurants) and 10 (products); no test seed replant ran.
 - Commits/PRs: user-owned; none created by assistant.
 - Native review: not assessed/started; follow the user-owned RDD switch and native candidate lifecycle after each applicable work-unit commit.
 
 ## Next Step
 
-Proceed with OM-03 backend code and tests. Do not edit diagrams, commit, push, or open a PR; the user handles delivery actions.
+Proceed with OM-04 backend code and tests. Do not edit diagrams, commit, push, or open a PR; the user handles delivery actions.
 
 ## Document Locator
 
