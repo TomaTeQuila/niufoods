@@ -10,4 +10,16 @@ class Order < ApplicationRecord
   validates :dispatch_status, inclusion: { in: DISPATCH_STATUSES }
   validates :total_clp, numericality: { only_integer: true, greater_than_or_equal_to: 0 }
   validates :idempotency_key, uniqueness: true
+  validates :delivery_address, presence: true, if: :delivery_order?
+  validate :must_have_order_items
+
+  private
+
+  def delivery_order?
+    order_type == "delivery"
+  end
+
+  def must_have_order_items
+    errors.add(:order_items, "must contain at least one item") if order_items.empty?
+  end
 end

@@ -20,11 +20,12 @@ class OrderManagementModelsTest < ActiveSupport::TestCase
   test "order and item associations preserve records across logical deletion" do
     restaurant = Restaurant.create!(name: "Niu", code: "niu")
     product = Product.create!(name: "Burger", sku: "burger", price_clp: 5_000)
-    order = Order.create!(restaurant: restaurant, order_number: "O-1", idempotency_key: "key-1",
-                          order_type: "pickup", customer_name: "Ada", customer_phone: "123",
-                          total_clp: 5_000, dispatch_status: "pending")
-    item = OrderItem.create!(order: order, product: product, quantity: 1,
-                             unit_price_clp: 5_000, subtotal_clp: 5_000)
+    order = Order.new(restaurant: restaurant, order_number: "O-1", idempotency_key: "key-1",
+                      order_type: "pickup", customer_name: "Ada", customer_phone: "123",
+                      total_clp: 5_000, dispatch_status: "pending")
+    order.order_items.build(product: product, quantity: 1, unit_price_clp: 5_000, subtotal_clp: 5_000)
+    order.save!
+    item = order.order_items.first
 
     assert_equal [order], restaurant.orders
     assert_equal [item], order.order_items
@@ -53,10 +54,13 @@ class OrderManagementModelsTest < ActiveSupport::TestCase
 
   test "idempotency keys are unique in validation and database" do
     Restaurant.create!(name: "Niu", code: "niu")
+    product = Product.create!(name: "Burger", sku: "burger", price_clp: 5_000)
     attributes = { restaurant: Restaurant.first, order_number: "O-1", idempotency_key: "key-1",
                    order_type: "pickup", customer_name: "Ada", customer_phone: "123",
                    total_clp: 0, dispatch_status: "pending" }
-    Order.create!(attributes)
+    order = Order.new(attributes)
+    order.order_items.build(product:, quantity: 1, unit_price_clp: 5_000, subtotal_clp: 5_000)
+    order.save!
     duplicate = Order.new(attributes.merge(order_number: "O-2"))
 
     assert_not duplicate.valid?

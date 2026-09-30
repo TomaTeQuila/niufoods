@@ -84,17 +84,17 @@ The Rails repository is currently a skeleton: it has no PostgreSQL application s
 
 ### OM-04 — Implement order query/create/logical-delete, price snapshots, and idempotency
 
-- [ ] Add JSON order collection/show/create/logical-delete endpoints only; do not add Order PUT/PATCH or standalone OrderItem routes.
-- [ ] Validate required restaurant/customer/type/items data, delivery-only address requirement, product references, quantities, and logical-delete state; persist a complete order and all items atomically.
-- [ ] Derive `unit_price_clp`, `subtotal_clp`, and `total_clp` from persisted product prices; ignore client price/total inputs and preserve historical snapshots after product updates/deletion.
-- [ ] Implement Idempotency-Key lookup/replay transaction-safely under concurrent requests; existing key returns original order with 200 regardless of payload differences, new order returns 201, and invalid requests persist no partial data.
-- [ ] Add request/model tests for pickup and delivery, invalid payload rollback, deleted-resource visibility, snapshots/totals, replay with changed payload, and concurrent same-key calls.
+- [x] Add JSON order collection/show/create/logical-delete endpoints only; do not add Order PUT/PATCH or standalone OrderItem routes.
+- [x] Validate required restaurant/customer/type/items data, delivery-only address requirement, product references, quantities, and logical-delete state; persist a complete order and all items atomically.
+- [x] Derive `unit_price_clp`, `subtotal_clp`, and `total_clp` from persisted product prices; ignore client price/total inputs and preserve historical snapshots after product updates/deletion.
+- [x] Implement Idempotency-Key lookup/replay transaction-safely under concurrent requests; existing key returns original order with 200 regardless of payload differences, new order returns 201, and invalid requests persist no partial data.
+- [x] Add request/model tests for pickup and delivery, invalid payload rollback, deleted-resource visibility, snapshots/totals, replay with changed payload, and concurrent same-key calls.
 - Route: **delegated direct**. Trigger evidence: multiple controllers/domain operations/migrations/indexes/request tests are non-trivial and related design reading must stay with the writer.
 - Acceptance: order routes/method set exactly matches scope; valid create returns 201; replay returns the original order with 200 and no duplicates; one row maximum per key even under concurrency; logical delete sets `deleted_at`, retains order/items, and hides it from GET; product changes never mutate prior snapshots/totals.
 - Checks: strict TDD; focused order model/request tests, including concurrency at the supported test database; `bin/rails test`.
 - Runtime harness: run Rails/PostgreSQL and exercise new create plus same-key replay; record exact command/scenario/result.
 - Commit evidence: user-owned; report changed files and verification, but do not commit.
-- Status: not started.
+- Status: complete including scoped Postman/CSRF compatibility (uncommitted; user owns commit/PR). Added order JSON collection/show/create/logical-delete endpoints, transaction-safe creation with database-unique idempotency replay, server-derived totals/item snapshots, and request/concurrency coverage. API response shape is `{ "order": { ... } }` for create/show and `{ "orders": [...] }` for collection; invalid create is 422 with `errors` array; delete is 204. RED: focused requests initially returned 404 because routes/controllers were absent (6 tests, 4 failures/2 expected HTML parse errors). GREEN: focused order request/concurrency tests passed 8 runs/30 assertions. REFACTOR: complete suite passed 13 runs/52 assertions; route inventory confirmed only GET/POST collection and GET/DELETE show. Assumption: `active: false` means unavailable for new orders, while `deleted_at` independently hides deleted records; inactive/deleted restaurants/products are rejected for order creation. Idempotency replay is looked up before payload validation and returns the original order even for changed input. CSRF follow-up complete: user-provided log showed `ActionController::InvalidAuthenticityToken` for JSON `POST /api/v1/orders`; `skip_forgery_protection` is scoped to `Api::V1::OrdersController` only. This stateless API does not use browser cookie/session authentication, so Postman needs no browser token; web controllers retain inherited CSRF protection. No global forgery setting changed.
 
 ### OM-05 — Close the backend slice with full verification and minimal setup documentation
 
@@ -126,7 +126,10 @@ The Rails repository is currently a skeleton: it has no PostgreSQL application s
 - Completed implementation/check work awaiting user commit: OM-01 documentation only.
 - OM-02 implementation verified against local PostgreSQL 14. `PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test`: 5 runs, 22 assertions, 0 failures, 0 errors, 0 skips (including parent spot-check). `bin/rails db:create db:migrate RAILS_ENV=test` succeeded; development migration is up.
 - Shell default Ruby was 2.6; Rails checks require selecting project Ruby 4.0.7 on `PATH`.
-- OM-03 API implementation and request verification are complete; pending OM-04 APIs and OM-05 full checks/docs. Formal native review could not yet scope the candidate cleanly because unrelated existing diagram modification is in the tracked diff and untracked selection was requested; do not absorb or edit the diagram.
+- OM-04 CSRF continuation complete: enabled controller forgery protection in a request-test context and observed no-token JSON POST return 422 (RED); added controller-local `skip_forgery_protection` only to `Api::V1::OrdersController`, then the no-token JSON create returned 201 (GREEN). Focused OM-04 request/concurrency suite passed 9 runs / 32 assertions; full suite passed 14 runs / 54 assertions (REFACTOR), no failures/errors/skips. `git diff --check` passed. The exemption is justified by the API being stateless and not using cookie/session authentication; web-controller protections and app-wide settings are unchanged.
+- OM-04 implementation: `PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test`: 13 runs, 52 assertions, 0 failures, 0 errors, 0 skips. Focused request/concurrency suite: 8 runs, 30 assertions, 0 failures, 0 errors, 0 skips. `bin/rails routes` confirms only GET/POST `/api/v1/orders`, GET/DELETE `/api/v1/orders/:id`; no order PUT/PATCH or standalone order-item routes. No manual running-server Postman smoke was performed.
+- OM-04 Postman example: `POST http://localhost:3000/api/v1/orders`, header `Content-Type: application/json`, header `Idempotency-Key: postman-order-001`, body `{"order":{"restaurant_id":1,"order_type":"delivery","customer_name":"Ada Lovelace","customer_phone":"+56912345678","delivery_address":"Av. Providencia 123","items":[{"product_id":1,"quantity":2}],"total_clp":1,"price_clp":1}}`. Client totals/prices are ignored; response carries persisted totals and snapshots.
+- OM-03 API implementation and request verification are complete; OM-04 APIs and OM-06 catalog seeding are also complete; pending OM-05 full checks/docs. Formal native review could not yet scope the candidate cleanly because unrelated existing diagram modification is in the tracked diff and untracked selection was requested; do not absorb or edit the diagram.
 - OM-03 changed files: `config/routes.rb`, `app/controllers/api/v1/restaurants_controller.rb`, `app/controllers/api/v1/products_controller.rb`, `test/integration/api_v1_catalog_test.rb`. `git diff --check` passed; generated log/cache changes from test runs were discarded.
 - OM-06 added `db/seeds.rb` and `test/integration/seeds_test.rb`. Focused seeds verification: 2 runs, 17 assertions, 0 failures/errors/skips; full `bin/rails test`: 11 runs, 79 assertions, 0 failures/errors/skips. Development DB inspection before mutation showed no Restaurants or Products; `bin/rails db:seed` targeted `niufoods_development` and completed; exact readback verified supplied IDs, names, codes/SKUs, integer CLP prices, `active=true`, `deleted_at=nil`, and nil Restaurant `dispatch_url`. PostgreSQL sequences read back at 3 (restaurants) and 10 (products); no test seed replant ran.
 - Commits/PRs: user-owned; none created by assistant.
@@ -134,7 +137,7 @@ The Rails repository is currently a skeleton: it has no PostgreSQL application s
 
 ## Next Step
 
-Proceed with OM-04 backend code and tests. Do not edit diagrams, commit, push, or open a PR; the user handles delivery actions.
+Proceed with OM-05 final verification/documentation. Do not edit diagrams, commit, push, or open a PR; the user handles delivery actions.
 
 ## Document Locator
 
