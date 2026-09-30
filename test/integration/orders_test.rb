@@ -18,6 +18,18 @@ class OrdersTest < ActionDispatch::IntegrationTest
     assert_equal 10_000, json.dig("order", "order_items", 0, "subtotal_clp")
   end
 
+  test "accepts a JSON order without a browser CSRF token" do
+    previous_setting = Api::V1::OrdersController.allow_forgery_protection
+    Api::V1::OrdersController.allow_forgery_protection = true
+
+    post "/api/v1/orders", headers: { "Idempotency-Key" => "csrf-free-1" }, params: order_payload, as: :json
+
+    assert_response :created
+    assert_equal "application/json", response.media_type
+  ensure
+    Api::V1::OrdersController.allow_forgery_protection = previous_setting
+  end
+
   test "requires a delivery address only for delivery" do
     post "/api/v1/orders", headers: { "Idempotency-Key" => "delivery-1" },
          params: order_payload(order_type: "delivery"), as: :json

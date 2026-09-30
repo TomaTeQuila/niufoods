@@ -1,6 +1,8 @@
 module Api
   module V1
     class OrdersController < ApplicationController
+      skip_forgery_protection
+
       def index
         orders = Order.where(deleted_at: nil).includes(:order_items).order(:id)
         render json: { orders: orders.map { |order| serialize(order) } }
