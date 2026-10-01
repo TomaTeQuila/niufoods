@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "scripts": {
+    "test": "esbuild app/javascript/dashboard.jsx --bundle --platform=node --format=cjs --packages=external --outfile=tmp/dashboard.cjs --jsx=automatic && node --test test/frontend/*.test.cjs",
+    "build": "esbuild app/javascript/dashboard.jsx --bundle --minify --outfile=public/assets/orders-dashboard.js --jsx=automatic"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.0"
+  }
+}

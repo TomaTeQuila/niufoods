@@ -1,0 +1,40 @@
+:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #fff; background: #29282d; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #29282d; color: #fff; }
+.dashboard-shell { max-width: 1040px; min-height: 100vh; margin: 0 auto; padding: clamp(1rem, 4vw, 3rem); }
+.dashboard-header { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .75rem; margin: calc(clamp(1rem, 4vw, 3rem) * -1) calc(clamp(1rem, 4vw, 3rem) * -1) 1.5rem; padding: .75rem clamp(1rem, 4vw, 3rem); background: #232227; }
+.brand-lockup { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 1rem; min-height: 52px; }
+.brand-logo { display: block; width: auto; height: clamp(1.75rem, 4vw, 2.5rem); max-width: min(30vw, 12rem); max-height: clamp(1.75rem, 4vw, 2.5rem); object-fit: contain; }
+.dashboard-heading .eyebrow { margin: 0 0 .25rem; color: #ef1010; text-transform: uppercase; letter-spacing: .13em; font-weight: 700; font-size: .72rem; }
+.dashboard-heading h1 { margin: 0; font-size: clamp(2rem, 5vw, 3rem); letter-spacing: -.04em; }
+.order-count { color: #fff; font-size: .9rem; }
+.dashboard-tools { display: grid; gap: .4rem; max-width: 30rem; margin: 0 0 1.25rem; }
+.search-label { font-size: .86rem; font-weight: 650; }
+.order-search { width: 100%; min-height: 44px; padding: .7rem .9rem; border: 1px solid #514e55; border-radius: 8px; background: #2e2c30; color: #fff; font: inherit; }
+.order-search::placeholder { color: #c1bec4; opacity: 1; }
+.order-search:hover { border-color: #817d86; }
+.order-search:focus-visible { outline: 2px solid #ef1010; outline-offset: 2px; }
+.order-list { display: grid; gap: .75rem; }
+.order-card { width: 100%; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: 1rem 1.2rem; text-align: left; border: 1px solid #48454c; border-radius: 12px; background: #2e2c30; color: #fff; cursor: pointer; }
+.order-card:hover, .order-card:focus-visible, .order-card.selected { border-color: #ef1010; outline: 2px solid #ef1010; outline-offset: 1px; }
+.order-main, .order-meta { display: grid; gap: .3rem; min-width: 0; }
+.order-main strong, .order-meta strong { font-size: 1rem; }
+.order-main span, .order-meta span { color: #e2dfe5; overflow-wrap: anywhere; font-size: .88rem; }
+.status { padding: .4rem .65rem; border-radius: 999px; background: #333235; color: #fff; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.status-sent { border: 1px solid #ef1010; color: #fff; }
+.status-error { background: #b70a0a; color: #fff; }
+.dashboard-state { margin: 12vh auto; max-width: 36rem; padding: 2rem; border: 1px solid #48454c; border-radius: 12px; text-align: center; background: #2e2c30; color: #fff; }
+.dashboard-error { border-color: #b70a0a; }
+.order-detail { margin-top: 1.25rem; padding: 1.25rem; border: 1px solid #48454c; border-radius: 12px; background: #2e2c30; overflow-wrap: anywhere; }
+.order-detail h2, .order-detail h3 { margin-top: 0; }
+.order-detail li { padding: .4rem 0; }
+.order-detail li span { margin-left: .5rem; }
+@media (max-width: 620px) {
+  .dashboard-header { grid-template-columns: 1fr; }
+  .brand-lockup { min-height: 44px; gap: .75rem; }
+  .brand-logo { max-width: min(42vw, 12rem); height: clamp(1.5rem, 8vw, 2rem); max-height: clamp(1.5rem, 8vw, 2rem); }
+  .order-card { grid-template-columns: 1fr auto; gap: .7rem; padding: .9rem; }
+  .order-main { grid-column: 1 / -1; }
+  .order-meta { grid-column: 1; }
+  .status { grid-column: 2; grid-row: 2; }
+}
