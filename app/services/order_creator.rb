@@ -21,6 +21,7 @@ class OrderCreator
     return Result.new(order:, replayed: false) if order.errors.any?
 
     Order.transaction { order.save! }
+    DispatchOrderJob.perform_async(order.id)
     Result.new(order:, replayed: false)
   rescue ActiveRecord::RecordNotUnique
     existing = Order.find_by!(idempotency_key: @idempotency_key)

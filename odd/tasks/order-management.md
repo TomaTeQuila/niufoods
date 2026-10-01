@@ -23,8 +23,8 @@ The Rails repository began as a skeleton and is being extended into the test's o
 
 ### Out of scope
 
-- Dispatch workflow, Redis/Sidekiq, workers/retries, simulated-store endpoints, dispatch status transitions, order update endpoints, standalone order-item routes, and order-generation scripts.
-- Any change to the external store integration.
+- Order update endpoints, standalone order-item routes, and order-generation scripts.
+- Any change to the external store integration beyond the locally simulated endpoint defined by the dispatch sequence diagram.
 
 ### Constraints and evidence
 
@@ -108,6 +108,20 @@ The Rails repository began as a skeleton and is being extended into the test's o
 - Commit evidence: user-owned; report changed files and verification, but do not commit.
 - Status: not started.
 
+### OM-10 — Implement Redis-backed Sidekiq order dispatch
+
+- [x] Reconcile the current runtime with the architecture and sequence diagrams: Redis queue, Sidekiq worker, dispatch module, simulated-store endpoint, and dispatch status transitions; preserve the existing PostgreSQL order schema and `pending|sent|error` state model.
+- [x] Enqueue dispatch only for a newly committed order; ensure idempotency replays do not enqueue duplicates and jobs cannot run before the order transaction commits.
+- [x] Implement the simulated-store HTTP endpoint and dispatch client from diagram requirements. Classify transient transport/server failures for Sidekiq retries and definitive responses as terminal `error`; record attempts/error details and successful `dispatched_at` consistently with the schema.
+- [x] Replace Solid Queue with Sidekiq as the configured Active Job adapter, configure Redis URL/connection, provide a local Redis + web + worker run path, and remove stale Solid Queue runtime configuration only where safe.
+- [x] Add focused job, dispatch-client, API, retry/status and idempotency tests; document how to run and observe the worker and how to exercise dispatch locally.
+- Route: **delegated direct**. Trigger evidence: implementation spans dependencies/lockfile, Rails job/service/client/controllers/configuration, runtime services, tests and documentation; diagram/source reading prepares the change.
+- Acceptance: a newly created order is persisted and queued once, the Sidekiq worker processes the job through the simulated store, success updates dispatch metadata, retryable errors are retried, terminal failures become `error`, and same-key replays do not create extra work. Redis/Sidekiq are observable in the local run path, and the app no longer starts Solid Queue.
+- Constraints: follow `docs/niufoods-architecture-diagram.pdf`, `docs/niufoods-sequence-diagram.png`, `docs/niufoods-db-schema-diagram.pdf`, and `docs/README.md`; do not edit diagrams. Keep API/web authentication behavior unchanged, do not implement a real external store integration, and do not commit/push/open a PR (user owns delivery).
+- TDD/verification: `strict_tdd: true`; runner `PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test`; demonstrate RED before implementation, GREEN, then REFACTOR. Verify focused tests and full Rails suite; exercise Redis/Sidekiq runtime if local services are available and report any unavailable integration check honestly.
+- Forecast: roughly 700–1,100 authored changed lines including focused tests/config/docs; revisit after implementation if the diagram reveals additional contract scope.
+- Status: implementation and functional verification complete (uncommitted; user owns delivery). Strict-TDD RED: before source implementation, focused tests failed as expected (5 runs, 1 assertion, 1 missing simulated-store route failure, 4 missing job/client constant errors). GREEN/refactor: focused dispatch suite passed 11 runs / 49 assertions; full `PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test` passed 32 runs / 169 assertions, zero failures/errors/skips. Parent spot-check: `PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test test/integration/order_dispatch_test.rb` passed 3 runs / 12 assertions. `bundle check`, `git diff --check`, route inventory, and `docker compose config --quiet` passed. Runtime smoke: local PostgreSQL test DB + Redis + Rails server + Sidekiq worker processed a newly created order through `POST /store_api/v1/orders`; API returned 201, then showed `sent`, 1 attempt, dispatch timestamp, no error. Same-key replay returned 200 and Redis processed count remained 1. Temporary smoke records were deleted and local Redis/server/worker stopped. Docker Compose images were not pulled or started; Compose syntax was validated only. `bin/ci` was not run because its dependency audits can contact non-RubyGems hosts outside the authorized network scope. Sidekiq 7.3.9 initially selected `connection_pool` 3.0.2, whose keyword-only `pop` broke Sidekiq's scheduled poller; pinned `connection_pool ~> 2.5` (resolved 2.5.5) and verified clean worker startup. Assumption: HTTP 5xx, 408/425/429, and transport/timeouts are retryable; other non-2xx responses are terminal. The dispatch client sends a stable `Idempotency-Key` derived from `order_number` to support at-least-once worker delivery. Native review is pending: selectorless STATUS required the provider capture `external.select_intended_untracked`, which is unavailable in this session; no native approval/receipt is claimed.
+
 ### OM-06 — Seed the supplied restaurant and product catalog
 
 - [x] Add idempotent, convergent Rails seeds for the three supplied Restaurants and ten supplied Products, keyed by `code` and `sku`; set supplied IDs only when available without overwriting unrelated records, and ensure the PostgreSQL ID sequences remain valid.
@@ -173,12 +187,13 @@ The Rails repository began as a skeleton and is being extended into the test's o
 - OM-03 API implementation and request verification are complete; OM-04 APIs and OM-06 catalog seeding are also complete; pending OM-05 full checks/docs. Formal native review could not yet scope the candidate cleanly because unrelated existing diagram modification is in the tracked diff and untracked selection was requested; do not absorb or edit the diagram.
 - OM-03 changed files: `config/routes.rb`, `app/controllers/api/v1/restaurants_controller.rb`, `app/controllers/api/v1/products_controller.rb`, `test/integration/api_v1_catalog_test.rb`. `git diff --check` passed; generated log/cache changes from test runs were discarded.
 - OM-06 added `db/seeds.rb` and `test/integration/seeds_test.rb`. Focused seeds verification: 2 runs, 17 assertions, 0 failures/errors/skips; full `bin/rails test`: 11 runs, 79 assertions, 0 failures/errors/skips. Development DB inspection before mutation showed no Restaurants or Products; `bin/rails db:seed` targeted `niufoods_development` and completed; exact readback verified supplied IDs, names, codes/SKUs, integer CLP prices, `active=true`, `deleted_at=nil`, and nil Restaurant `dispatch_url`. PostgreSQL sequences read back at 3 (restaurants) and 10 (products); no test seed replant ran.
+- OM-10 implemented Sidekiq/Redis dispatch, transaction-safe enqueue placement, simulated-store endpoint, retry/error transitions, local Compose dependencies, and developer setup/run instructions. Strict-TDD RED was observed before source work; focused suite passed 11 runs / 49 assertions, full suite passed 32 runs / 169 assertions, and live Rails + Sidekiq + Redis smoke dispatched an order and confirmed replay did not add work. Exact command outcomes and the connection-pool compatibility pin are recorded in the OM-10 status above. Docker images were not fetched or started; local compose syntax passed. No diagrams changed.
 - Commits/PRs: user-owned; none created by assistant.
 - Native review: preflight stopped at `intended_untracked_selection_required`; no review transaction was started or consented. Resume only by satisfying that exact provider-issued collection input, then query STATUS again.
 
 ## Next Step
 
-Implement OM-09 visual refinements to dashboard logo sizing, dark palette, and search styling. Then continue OM-05 final backend verification/documentation. Do not edit diagrams, commit, push, or open a PR; the user handles delivery actions.
+OM-09 dashboard visual refinements and OM-05 final backend verification remain separate follow-up tasks. OM-10 is complete on the current branch (`main`); diagrams remain read-only. Do not commit, push, or open a PR; the user handles delivery actions.
 
 ## Document Locator
 
