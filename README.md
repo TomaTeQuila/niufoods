@@ -1,106 +1,124 @@
 # Órdenes Niufoods
 
-Prueba técnica para recibir, validar, persistir y despachar órdenes de comida al restaurante correspondiente.
+Aplicación Rails para recibir, validar, persistir y despachar órdenes. Esta guía permite levantar el dashboard y el worker con Docker Compose, cargar datos de prueba y recorrer el flujo completo sin una tienda externa.
 
-## Estado actual
+## Inicio rápido para revisar
 
-La aplicación recibe órdenes en Rails, las persiste en PostgreSQL y las despacha en segundo plano mediante Sidekiq y Redis. El endpoint local de tienda simulada permite probar el recorrido completo sin integrar una tienda externa.
+Requisitos: Docker Engine y Docker Compose.
 
-## Decisiones de arquitectura
-
-- Monolito modular construido con Ruby on Rails.
-- PostgreSQL para la persistencia de datos.
-- React para la interfaz del dashboard.
-- Sidekiq y Redis para el despacho asíncrono y los reintentos.
-- Minitest para las pruebas automatizadas.
-- Idempotencia mediante el header `Idempotency-Key`.
-- Endpoint de tienda simulada para probar el despacho de órdenes.
-- Docker Compose para el entorno de desarrollo local.
-
-Se seleccionó el monolito porque el flujo actual de órdenes es cohesivo y no requiere dominios de negocio desplegables de forma independiente. Se mantendrán límites internos explícitos para que una futura integración con tiendas o un módulo de despacho pueda extraerse si las necesidades reales de escalamiento lo justifican.
-
-## Ejecutar localmente
-
-1. Iniciá PostgreSQL y Redis. El archivo [`docker-compose.yml`](docker-compose.yml) provee ambos servicios:
+1. Desde la raíz del repositorio, iniciá PostgreSQL, Redis, la aplicación web y Sidekiq:
 
    ```sh
-   docker compose up -d postgres redis
+   docker compose up --build
    ```
 
-2. Prepará la base y cargá el catálogo de prueba:
+   La primera ejecución construye la imagen y puede tardar unos minutos. Rails prepara las bases de datos al iniciar el servidor.
+
+2. En otra terminal, cargá el catálogo de prueba:
 
    ```sh
-   export DATABASE_HOST=127.0.0.1 DATABASE_PORT=5433 DATABASE_USER=niufoods DATABASE_PASSWORD=niufoods
-   export REDIS_URL=redis://localhost:6379/0
-   PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails db:prepare db:seed
+   docker compose exec web ./bin/rails db:seed
    ```
 
-3. En terminales separadas, iniciá la aplicación web y el worker:
+3. Abrí el dashboard en [http://localhost:3000](http://localhost:3000). El servicio `web` sirve la API, el endpoint de tienda simulada y los assets compilados del dashboard.
+
+4. Generá cinco órdenes de ejemplo desde la raíz del repositorio:
 
    ```sh
-   export DATABASE_HOST=127.0.0.1 DATABASE_PORT=5433 DATABASE_USER=niufoods DATABASE_PASSWORD=niufoods REDIS_URL=redis://localhost:6379/0
-   PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails server
+   ruby script/order_simulator.rb --count 5
    ```
 
-   En una segunda terminal, exportá las mismas variables y ejecutá:
+   El simulador envía órdenes a `http://localhost:3000/api/v1/orders` con claves de idempotencia únicas. Usa los restaurantes 1–3 y productos 1–10 que carga el seed. También podés crear órdenes manualmente con el ejemplo de Postman más abajo.
+
+5. Revisá el procesamiento del worker y las órdenes:
 
    ```sh
-   export DATABASE_HOST=127.0.0.1 DATABASE_PORT=5433 DATABASE_USER=niufoods DATABASE_PASSWORD=niufoods REDIS_URL=redis://localhost:6379/0
-   PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bundle exec sidekiq -C config/sidekiq.yml
+   docker compose logs -f worker
+   curl -sS http://localhost:3000/api/v1/orders
    ```
 
-   En producción, Kamal ejecuta el worker como proceso separado; `REDIS_URL` debe estar configurado como secreto para ambos procesos.
+   El listado devuelve `{ "orders": [...] }`. Una orden aceptada se encola en Redis y el worker la envía al endpoint simulado; normalmente termina con `dispatch_status: "sent"`. Si el despacho todavía está pendiente, consultá el listado de nuevo.
 
-## Probar el despacho
+Para detener los servicios, usá `Ctrl+C` en la terminal de Compose. También podés ejecutar `docker compose down`. Para borrar además las bases de datos y el estado de Redis y comenzar desde cero:
 
-Creá una orden nueva con una clave de idempotencia única. Reemplazá los IDs si tu catálogo usa otros:
+```sh
+docker compose down -v
+```
+
+> `down -v` elimina permanentemente los volúmenes locales de PostgreSQL y Redis.
+
+## Crear una orden con Postman o curl
+
+Configurá en Postman una solicitud `POST` a `http://localhost:3000/api/v1/orders` con estos headers:
+
+| Header | Valor |
+|---|---|
+| `Content-Type` | `application/json` |
+| `Idempotency-Key` | `postman-reviewer-001` |
+
+En **Body → raw → JSON**, enviá:
+
+```json
+{
+  "order": {
+    "restaurant_id": 1,
+    "order_type": "pickup",
+    "customer_name": "Ada Lovelace",
+    "customer_phone": "555-0100",
+    "items": [
+      { "product_id": 1, "quantity": 2 }
+    ]
+  }
+}
+```
+
+La primera solicitud con esa clave devuelve `201 Created` y un JSON `{ "order": { ... } }` con la orden persistida, sus ítems, el total calculado por el servidor y el estado de despacho. Repetir el mismo payload con el mismo `Idempotency-Key` devuelve `200 OK` y la orden existente, sin crear otra orden ni encolar otro despacho. Usá una clave nueva para cada orden distinta. Si el catálogo todavía no está cargado o el payload no es válido, la API responde `422 Unprocessable Entity` con `{ "errors": [...] }`.
+
+El mismo ejemplo con curl:
 
 ```sh
 curl -i -X POST http://localhost:3000/api/v1/orders \
   -H 'Content-Type: application/json' \
-  -H 'Idempotency-Key: local-dispatch-001' \
-  -d '{"order":{"restaurant_id":1,"order_type":"pickup","customer_name":"Ada","customer_phone":"555-0100","items":[{"product_id":1,"quantity":2}]}}'
+  -H 'Idempotency-Key: postman-reviewer-001' \
+  -d '{"order":{"restaurant_id":1,"order_type":"pickup","customer_name":"Ada Lovelace","customer_phone":"555-0100","items":[{"product_id":1,"quantity":2}]}}'
 ```
 
-Una orden nueva devuelve `201`; repetir el mismo `Idempotency-Key` devuelve `200` y no agrega otro job. Sidekiq registra el procesamiento en la terminal del worker. Consultá `GET /api/v1/orders` para verificar `dispatch_status`, `dispatch_attempts`, `last_dispatch_error` y `dispatched_at`.
+## Endpoints útiles
 
-La tienda simulada recibe `POST /store_api/v1/orders`. El despacho usa `restaurants.dispatch_url` cuando está definido; si no, usa `STORE_API_URL` o el endpoint local por defecto. El cliente manda `Idempotency-Key` estable basado en `order_number`, apropiado para un worker con entrega al menos una vez.
+| Método y ruta | Uso |
+|---|---|
+| `GET /api/v1/restaurants` | Consultar restaurantes activos |
+| `GET /api/v1/products` | Consultar productos activos |
+| `POST /api/v1/orders` | Crear una orden idempotente |
+| `GET /api/v1/orders` | Listar órdenes y su estado de despacho |
+| `GET /api/v1/orders/:id` | Consultar una orden |
+| `POST /store_api/v1/orders` | Endpoint local simulado para recibir despachos |
+| `GET /up` | Health check de Rails |
 
-## Endpoints
+## Cómo funciona el despacho
 
-```text
-POST /api/v1/orders
-GET  /api/v1/orders
-GET  /api/v1/orders/:id
-```
+1. Rails valida la clave de idempotencia, el restaurante, los productos y las cantidades.
+2. La orden y sus ítems se guardan en PostgreSQL; el total se calcula con los precios del catálogo.
+3. Sidekiq toma el job desde Redis y envía la orden al endpoint local simulado.
+4. La API simula una aceptación `201`; Rails actualiza `dispatch_status` y los campos de seguimiento. Sidekiq reintenta fallos de transporte y respuestas HTTP reintentables.
 
-Endpoint de tienda simulada:
-
-```text
-POST /store_api/v1/orders
-```
-
-La API devuelve órdenes en JSON; el endpoint simulado responde `201` con estado `accepted` cuando recibe un `order_number` válido.
-
-## Flujo de despacho
-
-1. Un canal digital o el simulador Ruby envía una orden a la API Rails.
-2. Rails valida el payload y la clave de idempotencia.
-3. La orden y sus ítems se persisten transaccionalmente en PostgreSQL.
-4. Un job de despacho se encola en Redis.
-5. Sidekiq envía la orden a la tienda simulada.
-6. El estado de despacho se actualiza a `sent` o `error`.
-7. Los despachos fallidos se reintentan según la configuración de Sidekiq.
+El worker usa la dirección interna de Compose para llamar al servicio `web`. No hace falta configurar una tienda externa.
 
 ## Verificación
+
+La suite Rails configurada para el proyecto se ejecuta localmente con Ruby 4.0.7:
 
 ```sh
 PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test
 ```
 
-## Reglas del proyecto
+El dashboard usa React; su bundle ya está incluido en `public/assets`. Para recompilarlo después de modificar su fuente, ejecutá `npm ci && npm run build`.
 
-- Los totales se calculan en el servidor utilizando los precios de productos almacenados en PostgreSQL.
-- Los precios de los ítems se guardan como snapshots históricos.
-- Las solicitudes duplicadas que utilicen la misma clave de idempotencia no deben crear órdenes duplicadas ni encolar otro despacho.
+## Arquitectura y reglas del proyecto
+
+- Monolito modular construido con Ruby on Rails; PostgreSQL es la fuente de persistencia.
+- React renderiza el dashboard; Sidekiq y Redis gestionan el despacho asíncrono y los reintentos.
+- Minitest cubre la aplicación y el simulador Ruby genera órdenes con claves idempotentes únicas.
+- La idempotencia evita duplicar órdenes y jobs cuando se repite una solicitud con la misma clave.
+- Los totales se calculan en el servidor y los precios de los ítems se guardan como snapshots históricos.
 - Los errores HTTP 5xx, throttling y fallos de transporte se reintentan; los errores definitivos 4xx terminan con estado `error`.
