@@ -2,11 +2,11 @@
 
 ## Objective
 
-Deliver the approved PostgreSQL-backed Rails order-management API: restaurant and product administration, order creation/query/logical deletion, server-calculated CLP totals and immutable item price snapshots, and transaction-safe `Idempotency-Key` replay.
+Deliver the PostgreSQL-backed Rails order-management application: restaurant and product administration, order creation/query/logical deletion, server-calculated CLP totals and immutable item price snapshots, transaction-safe `Idempotency-Key` replay, and the Spanish-language, Niu Foods/Niu Sushi-branded React operational dashboard.
 
 ## Problem and Why
 
-The Rails repository is currently a skeleton: it has no PostgreSQL application schema, domain models, API routes, or meaningful tests, and `config/database.yml` still points at SQLite. The user authorized implementing the defined backend slice and selected ODD instead of continuing the SDD pipeline. The tracking document records bounded implementation work and observed verification. The user owns commits and pull requests; do not commit, push, or open PRs.
+The Rails repository began as a skeleton and is being extended into the test's order-management application. The user has now explicitly expanded the earlier backend-only scope to include a React dashboard matching the technical test. The tracking document records bounded implementation work and observed verification. The user owns commits and pull requests; do not commit, push, or open PRs.
 
 ## Scope and Constraints
 
@@ -19,17 +19,18 @@ The Rails repository is currently a skeleton: it has no PostgreSQL application s
 - Calculate CLP totals from persisted product prices, snapshot item unit price/subtotal at creation, and keep historical prices/totals stable after product price changes.
 - Idempotency-key order creation replay returns the existing order with HTTP 200; a new order returns HTTP 201. Database-level uniqueness/transaction handling must prevent duplicate rows during concurrent same-key requests. Same-key different-payload replay returns the original order without mutation.
 - Cover models and requests with Minitest using strict RED → GREEN → REFACTOR.
+- Add a React dashboard at the Rails root that reads the existing order and restaurant JSON APIs, displays the operational fields required by the test, uses Niu Foods/Niu Sushi branding and Spanish UI, and includes the requested inert search field.
 
 ### Out of scope
 
-- Frontend/dashboard, React setup, dispatch workflow, Redis/Sidekiq, workers/retries, simulated-store endpoints, dispatch status transitions, order update endpoints, standalone order-item routes, and order-generation scripts.
+- Dispatch workflow, Redis/Sidekiq, workers/retries, simulated-store endpoints, dispatch status transitions, order update endpoints, standalone order-item routes, and order-generation scripts.
 - Any change to the external store integration.
 
 ### Constraints and evidence
 
 - Preserve existing untracked OpenSpec files; align their text as an explicit documentation task rather than treating them as implementation authority.
 - Do not add application-code comments.
-- Current branch is `core/feature/order-module-init`, already feature-named and at the same commit as `main`/`origin/main` (`5f82c54`); no branch change is needed before implementation.
+- Current OM-07 working branch is `ui/feature/new-react-dashboard`; prior backend work was performed on `core/feature/order-module-init`. Do not create commits or alter diagrams; delivery remains user-owned.
 - Existing `config/ci.rb` defines `bin/ci` as setup, RuboCop, bundler-audit, importmap audit, Brakeman, `bin/rails test`, and test seed replant.
 - The schema diagram defines fields and relationships but not nullability, defaults, uniqueness/index details. Implement only constraints justified by the approved contract and relational integrity; document the chosen minimal persistence constraints in migrations/tests.
 
@@ -43,7 +44,7 @@ The Rails repository is currently a skeleton: it has no PostgreSQL application s
 
 ## Delivery Forecast and Strategy
 
-- Forecast: approximately **800–1,150 authored changed lines** across documentation, migrations/configuration, models, controllers, and request/model tests; generated schema output is excluded from the authored count. This is an early estimate because the repository has no existing application conventions to reuse.
+- Forecast: approximately **1,400–2,000 authored changed lines** across backend and the React dashboard; generated schema/build output is excluded from the authored count. This is an early estimate because the repository has no existing application conventions to reuse.
 - Delivery: user-owned. Assistant makes code changes and records verification only; user handles commits, PR strategy, and pull request creation. No chain-strategy question or commits by assistant.
 
 ## Actionable Tasks
@@ -118,8 +119,48 @@ The Rails repository is currently a skeleton: it has no PostgreSQL application s
 - Commit evidence: user-owned; do not commit, push, or open a PR.
 - Status: complete (uncommitted; user owns commit/PR). RED: focused seeds test failed (1 run, 1 assertion) because seed loading created no catalog rows. GREEN: focused suite passed (2 runs, 17 assertions); full test suite passed (11 runs, 79 assertions). Development database was empty before seeding; `bin/rails db:seed` created the requested 3 restaurants and 10 products in `niufoods_development`; exact readback passed, with ID sequences at 3 and 10. Collision behavior and rerun convergence are covered by the focused test.
 
+### OM-07 — Build the React operational orders dashboard
+
+- [x] Serve a dashboard page at the Rails root with an accessible React mount point and locally built frontend assets; preserve existing Rails/Importmap behavior outside the dashboard.
+- [x] Fetch orders and restaurants from the existing same-origin `/api/v1` endpoints and join by `restaurant_id`; show order identifier, destination, total CLP, pickup/delivery type, creation time, and dispatch status. Provide loading, empty, and error states; allow selecting an order to inspect customer and item details when available.
+- [x] Add focused frontend tests for required order fields, restaurant-name mapping, status/type labels, empty/loading/error states, and order selection; add Rails integration coverage for the dashboard entry route.
+- Route: **delegated direct**. Trigger evidence: implementation spans Rails routing/view and multiple non-trivial React, styling, and test files; reading that prepares the write was delegated to the explorer.
+- Acceptance: `GET /` serves the React dashboard, all assignment-required fields are correctly rendered from current APIs, there is no dependency on external runtime CDNs, and the UI remains usable on narrow screens.
+- TDD/verification: strict TDD; observe failing frontend and Rails route tests before implementation, then passing checks and refactor evidence. Run focused frontend tests/build and `PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test`.
+- Commit evidence: user-owned; report changed files and verification, but do not commit.
+- Status: implementation and functional checks complete (uncommitted; user owns commit/PR); native review pending. Strict TDD: RED: the new Rails root integration test returned 404 before the dashboard route/controller/view existed; the frontend test command failed because the dashboard component did not exist. GREEN: offline dependency installation completed for cached React 18.3.1, ReactDOM 18.3.1, esbuild 0.28.0; `npm test` passed 3 tests and `bin/rails test test/integration/dashboard_test.rb` passed 1 run / 5 assertions. REFACTOR: guarded browser-only React mounting so the component can be imported for Node rendering tests, externalized React during test bundling to keep the test artifact small, and reran checks: `npm test` passed 3/3; `npm run build` generated the local 143.1 KB dashboard bundle; `PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test` passed 21 runs / 118 assertions. No failures/errors/skips. Parent spot-check: `npm test` passed 3/3. `jsdom` was not used because its uncached `cssstyle` dependency prevented offline installation; frontend coverage uses React server rendering for required fields and view states/selection. No network access or commits.
+
+### OM-08 — Apply Spanish localization, Niu branding, and an inert search field
+
+- [x] Translate all dashboard UI, accessibility labels, fallback text, and page metadata into Spanish.
+- [x] Add the official Niu Sushi and Niu Foods logos as transparent PNG assets from the official logo sources; use the Niu Sushi site palette (brand red `#ef1010`, charcoal `#232227`/`#29282d`, and white) consistently across the dashboard.
+- [x] Add an accessible text search input with a Spanish placeholder, but do not connect it to state, filtering, submission, or any search behavior.
+- [x] Update frontend tests for Spanish labels, logos, and the inert input; preserve the existing dashboard behavior and API contract.
+- Route: **delegated direct**. Trigger evidence: the change spans React markup, CSS, two brand assets, and frontend tests; required brand/source mapping was delegated before writing.
+- Acceptance: no user-facing dashboard text remains in English; both real brand marks display without opaque black backgrounds; colors match the publicly visible Niu Sushi brand tokens; the search field accepts text but does not alter the order list.
+- Checks: strict TDD; record RED/GREEN/REFACTOR; run `npm test`, `npm run build`, and `PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test`; inspect generated PNG dimensions/transparency and visually read back the dashboard.
+- Brand evidence: official logo assets from `https://www.niusushi.cl/assets/images/niusushi/niusushi-logo-header.svg` and `https://www.niusushi.cl/assets/images/desktop/niufoods-logo-footer.svg`; official site exposes brand tokens `--brand-primary: #ef1010`, `--bg-navbar: #232227`, and `--bg-body-order-success: #29282d`.
+- Commit evidence: user-owned; report changed files and verification, but do not commit.
+- Status: complete (uncommitted; user owns commit/PR). Strict TDD: RED: the new assertions failed against the English dashboard, missing brand marks/search field, and English HTML title. GREEN: official SVGs were copied locally and converted with `rsvg-convert` to transparent RGBA PNGs (Niu Foods 920×380; Niu Sushi 920×353); Spanish UI, metadata, accessibility labels, official palette, and a native text input with no state/handler/filter were implemented. REFACTOR/final checks: `npm test` passed 4 tests; `npm run build` produced the local JS bundle; `PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test` passed 21 runs / 120 assertions, zero failures/errors/skips; `git diff --check` passed. Tests inspect PNG alpha transparency, required official palette tokens, Spanish render states/details/fallbacks, and verify the input is editable but has no event/value behavior. No network use, backend/API changes, diagram edits, or commits.
+
+### OM-09 — Refine dashboard logo sizing, dark brand surfaces, and search styling
+
+- [ ] Correct logo sizing and placement so the Niu marks are compact, legible, and do not dominate or distort the dashboard header; retain appropriate aspect ratio and responsive sizing.
+- [ ] Apply the official Niu Sushi dark charcoal surfaces with brand-red accents and readable light text so both logos remain visible, using the supplied screenshots as visual guidance.
+- [ ] Restyle the inert text search field to fit the dashboard design with clear focus/hover states and responsive layout; do not add search behavior.
+- [ ] Add/update frontend assertions for bounded responsive logo sizing and the branded search/control styling while preserving Spanish UI and order behavior.
+- Route: **delegated direct**. Trigger evidence: styling/markup and tests span multiple non-trivial frontend files; existing visual symptoms and CSS constraints must be investigated with the write.
+- Acceptance: logos render at intentional dashboard scale without cropping or distortion; the overall dashboard uses the official dark Niu Sushi palette and adequate contrast; the search input is visually integrated, accessible, and still behaviorless.
+- Checks: strict TDD; record observed RED/GREEN/REFACTOR; run `npm test`, `npm run build`, full Rails tests, and `git diff --check`; visually inspect the served page against the supplied screenshots.
+- Commit evidence: user-owned; no commits, push, PR, or diagram edits.
+- Status: not started.
+
 ## Progress and Evidence
 
+- OM-08 completed Spanish dashboard text/accessibility/title/fallbacks, official Niu Foods and Niu Sushi transparent PNG logos with original SVGs retained locally, official charcoal/red palette, and an accessible text-only search field without search behavior. RED was observed against old markup/title. Final `npm test`: 4 passed; `npm run build`: successful; full Rails suite: 21 runs / 120 assertions, no failures/errors/skips; `git diff --check` passed.
+- OM-07 implementation added the React dashboard, same-origin API fetch/join, accessible responsive order cards, optional customer/item detail, local compiled assets, and focused test coverage. `npm test` passed 3 tests; `npm run build` succeeded; full Rails suite passed 21 runs / 118 assertions.
+- RDD remains enabled globally. Parent risk assessment classified the diff high/unassessable because the dashboard files are untracked. Selectorless native STATUS then required an `external.select_intended_untracked` input with provider-bound JSON; that operation is unavailable in the current tool surface, so no guessed selection or alternative review command was run. Native review is pending this exact collection input. Parent `npm test` spot-check passed 3/3; `git diff --check` passed.
+- OM-07 exploration confirmed the full assignment expects a dashboard with order identifier, destination, total, order type, creation timestamp, and dispatch status. The Rails root currently has no page; orders API exposes `restaurant_id` but not restaurant name, so the dashboard must load `/api/v1/restaurants` and join by ID. The existing order response supports optional customer/item details. React/importmap integration and frontend test tooling are not installed; use a local build rather than runtime CDN dependencies.
 - Completed exploration: confirmed Rails 8.1.4/Ruby 4.0.7 skeleton, SQLite configuration, empty application route/domain surface, Minitest/fixtures, and configured `bin/ci` checks.
 - OM-01 proposal/spec alignment edits are complete and were read back; verified all three resources use `deleted_at`, Restaurant `active` is independent/editable, deleted records are hidden from GET, history is retained, and route/method scope is unchanged. Documentation-only structural check passed; test/runtime harness N/A.
 - Repository status before implementation: branch `core/feature/order-module-init` at the same commit as `main`; pre-existing untracked OpenSpec change files must be preserved.
@@ -133,11 +174,11 @@ The Rails repository is currently a skeleton: it has no PostgreSQL application s
 - OM-03 changed files: `config/routes.rb`, `app/controllers/api/v1/restaurants_controller.rb`, `app/controllers/api/v1/products_controller.rb`, `test/integration/api_v1_catalog_test.rb`. `git diff --check` passed; generated log/cache changes from test runs were discarded.
 - OM-06 added `db/seeds.rb` and `test/integration/seeds_test.rb`. Focused seeds verification: 2 runs, 17 assertions, 0 failures/errors/skips; full `bin/rails test`: 11 runs, 79 assertions, 0 failures/errors/skips. Development DB inspection before mutation showed no Restaurants or Products; `bin/rails db:seed` targeted `niufoods_development` and completed; exact readback verified supplied IDs, names, codes/SKUs, integer CLP prices, `active=true`, `deleted_at=nil`, and nil Restaurant `dispatch_url`. PostgreSQL sequences read back at 3 (restaurants) and 10 (products); no test seed replant ran.
 - Commits/PRs: user-owned; none created by assistant.
-- Native review: not assessed/started; follow the user-owned RDD switch and native candidate lifecycle after each applicable work-unit commit.
+- Native review: preflight stopped at `intended_untracked_selection_required`; no review transaction was started or consented. Resume only by satisfying that exact provider-issued collection input, then query STATUS again.
 
 ## Next Step
 
-Proceed with OM-05 final verification/documentation. Do not edit diagrams, commit, push, or open a PR; the user handles delivery actions.
+Implement OM-09 visual refinements to dashboard logo sizing, dark palette, and search styling. Then continue OM-05 final backend verification/documentation. Do not edit diagrams, commit, push, or open a PR; the user handles delivery actions.
 
 ## Document Locator
 

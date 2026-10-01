@@ -1,3 +1,4 @@
 .atl/
 tmp/
 log/
+node_modules/
