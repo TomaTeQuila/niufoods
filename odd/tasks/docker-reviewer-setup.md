@@ -22,7 +22,7 @@ Compose currently provides only Postgres and Redis, while the README requires ho
 
 ## Route and forecast
 - Route: delegated direct, because implementation spans Compose and README and the Docker/config/README mapping was performed as preparation by the delegated writer.
-- Forecast: approximately 225 authored changed lines across Compose, README, and this task document (183 additions/deletions in source files plus 42 task-document lines); below ~400 lines.
+- Forecast: approximately 229 authored changed lines across Compose, README, and this task document (183 additions/deletions in source files plus 46 task-document lines); below ~400 lines.
 
 ## Tasks
 - [x] DRS-1: Added web and Sidekiq Compose services and replaced README setup with reviewer-oriented Spanish quick path, seed, simulator, API/Postman/idempotency, verification, and cleanup instructions.
@@ -36,7 +36,7 @@ Compose currently provides only Postgres and Redis, while the README requires ho
 - [x] Ran the exact Rails suite; it exited 1: 33 tests, 149 assertions, 3 failures, 1 error. The observed failures include a duplicate restaurant ID 1 during the seed test, a model association expecting 1 but seeing 4, and catalog API tests seeing seeded restaurants/products alongside test records.
 - [x] Skipped Docker image build/runtime checks; no Docker Hub pull authorization was granted.
 - [x] Updated and read back this task document and its Engram mirror.
-- [ ] Commit the completed work on `chore/docker-reviewer-setup` using a Conventional Commit; do not push or open a PR.
+- [x] Work-unit commit `3f3dd46` (`chore(docker): add reviewer compose setup`) on `chore/docker-reviewer-setup`; no push or PR.
 
 ## Acceptance criteria
 - `docker compose up --build` describes a web/dashboard service and Sidekiq worker backed by Compose Postgres/Redis, with internal dispatch using Compose DNS.
