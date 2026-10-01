@@ -4,16 +4,7 @@ Prueba técnica para recibir, validar, persistir y despachar órdenes de comida 
 
 ## Estado actual
 
-El proyecto se encuentra actualmente en la fase de arquitectura y configuración del entorno. El código de la aplicación todavía no ha sido implementado.
-
-Documentación completada:
-
-- Diagrama de arquitectura monolítica.
-- Diagrama entidad-relación.
-- Diagrama del esquema de base de datos.
-- Diagrama de secuencia de una orden.
-
-La documentación está disponible en [`docs/`](docs/).
+La aplicación recibe órdenes en Rails, las persiste en PostgreSQL y las despacha en segundo plano mediante Sidekiq y Redis. El endpoint local de tienda simulada permite probar el recorrido completo sin integrar una tienda externa.
 
 ## Decisiones de arquitectura
 
@@ -28,32 +19,54 @@ La documentación está disponible en [`docs/`](docs/).
 
 Se seleccionó el monolito porque el flujo actual de órdenes es cohesivo y no requiere dominios de negocio desplegables de forma independiente. Se mantendrán límites internos explícitos para que una futura integración con tiendas o un módulo de despacho pueda extraerse si las necesidades reales de escalamiento lo justifican.
 
-## Entorno verificado
+## Ejecutar localmente
 
-Las siguientes versiones fueron verificadas durante la configuración inicial:
+1. Iniciá PostgreSQL y Redis. El archivo [`docker-compose.yml`](docker-compose.yml) provee ambos servicios:
 
-| Herramienta | Versión | Estado |
-| --- | --- | --- |
-| Docker Engine | 29.4.0 | Instalado y ejecutándose |
-| Docker Compose | v5.1.1 | Instalado |
-| Ruby | 4.0.7 | Seleccionado para este proyecto mediante rbenv |
-| rbenv | 1.3.2 | Instalado y configurado |
-| Ruby on Rails | 8.1.4 | Instalado |
+   ```sh
+   docker compose up -d postgres redis
+   ```
 
-La aplicación Rails todavía no ha sido inicializada.
+2. Prepará la base y cargá el catálogo de prueba:
 
-PostgreSQL y Redis se ejecutarán mediante Docker Compose. Las instalaciones locales de PostgreSQL y Redis no serán necesarias para la configuración final.
+   ```sh
+   export DATABASE_HOST=127.0.0.1 DATABASE_PORT=5433 DATABASE_USER=niufoods DATABASE_PASSWORD=niufoods
+   export REDIS_URL=redis://localhost:6379/0
+   PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails db:prepare db:seed
+   ```
 
-## Componentes planificados
+3. En terminales separadas, iniciá la aplicación web y el worker:
 
-- API Rails para crear y consultar órdenes.
-- Módulo de órdenes para validación, cálculo de totales y persistencia.
-- Módulo de despacho para comunicarse con la tienda simulada.
-- Worker Sidekiq para el despacho en segundo plano y los reintentos.
-- Dashboard React para visualizar las órdenes.
-- Script Ruby para generar órdenes de prueba.
+   ```sh
+   export DATABASE_HOST=127.0.0.1 DATABASE_PORT=5433 DATABASE_USER=niufoods DATABASE_PASSWORD=niufoods REDIS_URL=redis://localhost:6379/0
+   PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails server
+   ```
 
-## API planificada
+   En una segunda terminal, exportá las mismas variables y ejecutá:
+
+   ```sh
+   export DATABASE_HOST=127.0.0.1 DATABASE_PORT=5433 DATABASE_USER=niufoods DATABASE_PASSWORD=niufoods REDIS_URL=redis://localhost:6379/0
+   PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bundle exec sidekiq -C config/sidekiq.yml
+   ```
+
+   En producción, Kamal ejecuta el worker como proceso separado; `REDIS_URL` debe estar configurado como secreto para ambos procesos.
+
+## Probar el despacho
+
+Creá una orden nueva con una clave de idempotencia única. Reemplazá los IDs si tu catálogo usa otros:
+
+```sh
+curl -i -X POST http://localhost:3000/api/v1/orders \
+  -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: local-dispatch-001' \
+  -d '{"order":{"restaurant_id":1,"order_type":"pickup","customer_name":"Ada","customer_phone":"555-0100","items":[{"product_id":1,"quantity":2}]}}'
+```
+
+Una orden nueva devuelve `201`; repetir el mismo `Idempotency-Key` devuelve `200` y no agrega otro job. Sidekiq registra el procesamiento en la terminal del worker. Consultá `GET /api/v1/orders` para verificar `dispatch_status`, `dispatch_attempts`, `last_dispatch_error` y `dispatched_at`.
+
+La tienda simulada recibe `POST /store_api/v1/orders`. El despacho usa `restaurants.dispatch_url` cuando está definido; si no, usa `STORE_API_URL` o el endpoint local por defecto. El cliente manda `Idempotency-Key` estable basado en `order_number`, apropiado para un worker con entrega al menos una vez.
+
+## Endpoints
 
 ```text
 POST /api/v1/orders
@@ -67,9 +80,9 @@ Endpoint de tienda simulada:
 POST /store_api/v1/orders
 ```
 
-Los payloads, las respuestas, las instrucciones de instalación y los comandos de ejecución se agregarán después de inicializar la aplicación Rails.
+La API devuelve órdenes en JSON; el endpoint simulado responde `201` con estado `accepted` cuando recibe un `order_number` válido.
 
-## Flujo de órdenes planificado
+## Flujo de despacho
 
 1. Un canal digital o el simulador Ruby envía una orden a la API Rails.
 2. Rails valida el payload y la clave de idempotencia.
@@ -79,11 +92,15 @@ Los payloads, las respuestas, las instrucciones de instalación y los comandos d
 6. El estado de despacho se actualiza a `sent` o `error`.
 7. Los despachos fallidos se reintentan según la configuración de Sidekiq.
 
-## Comandos de desarrollo
+## Verificación
 
+```sh
+PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test
+```
 
 ## Reglas del proyecto
 
 - Los totales se calculan en el servidor utilizando los precios de productos almacenados en PostgreSQL.
 - Los precios de los ítems se guardan como snapshots históricos.
-- Las solicitudes duplicadas que utilicen la misma clave de idempotencia no deben crear órdenes duplicadas.
+- Las solicitudes duplicadas que utilicen la misma clave de idempotencia no deben crear órdenes duplicadas ni encolar otro despacho.
+- Los errores HTTP 5xx, throttling y fallos de transporte se reintentan; los errores definitivos 4xx terminan con estado `error`.

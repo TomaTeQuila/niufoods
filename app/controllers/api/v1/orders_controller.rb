@@ -53,6 +53,9 @@ module Api
           delivery_address: order.delivery_address,
           total_clp: order.total_clp,
           dispatch_status: order.dispatch_status,
+          dispatch_attempts: order.dispatch_attempts,
+          last_dispatch_error: order.last_dispatch_error,
+          dispatched_at: order.dispatched_at,
           created_at: order.created_at,
           order_items: order.order_items.map do |item|
             {
