@@ -199,3 +199,15 @@ OM-09 dashboard visual refinements and OM-05 final backend verification remain s
 
 - Repository-relative: `odd/tasks/order-management.md`
 - Absolute: `/Users/amaromontero/Software/niufoods-test/niufoods/odd/tasks/order-management.md`
+
+### OM-11 — Show order details in an accessible modal
+
+- [x] Replace appended order-card details with a modal overlay in the current dashboard view when an order card is selected.
+- [x] Preserve existing card/list appearance and summary details; provide accessible dialog semantics, keyboard dismissal, and focus handling without changing API/backend behavior.
+- [x] Keep the JEV natural-language search work deferred; do not add filtering or other search behavior.
+- Route: **delegated direct**. Trigger evidence: React rendering and frontend tests are multiple non-trivial files; read-to-write preparation is owned by the bounded writer.
+- Authorized scope: `app/javascript/dashboard.jsx` and `test/frontend/dashboard.test.cjs` only, plus this task tracker and its Engram mirror.
+- Acceptance: selecting a card shows only that order's summary in an accessible modal overlay, dismisses via close control/Escape, and preserves existing list and order behavior.
+- Checks: strict TDD RED → GREEN → REFACTOR; `npm test`, `npm run build`, `PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test`, and `git diff --check`.
+- Commit evidence: user-owned; no commit, push, or PR.
+- Status: implementation complete; no commit, push, or PR. Strict TDD: RED: `npm test` failed the two new assertions (modal semantics absent and no close/focus behavior) while existing 4 tests passed. GREEN: modal overlay and close/focus handling implemented; `npm test` passed 6/6. REFACTOR: extracted modal style objects and reran checks; `npm test` passed 6/6, `npm run build` succeeded (144.9 KB bundle), and `git diff --check` passed. Full `PATH="$HOME/.rbenv/versions/4.0.7/bin:$PATH" bin/rails test` was run and failed unrelated to the frontend change: 33 runs / 149 assertions, 3 failures and 1 error (model association expected 1 got 4; seeded test ID collision at restaurants.id=1; catalog request expected only new restaurant/product but existing seed rows were returned). Build-generated bundle/cache changes were restored; only the authorized React component, frontend test, and tracker remain modified. No backend/API/database/search behavior or diagrams changed.

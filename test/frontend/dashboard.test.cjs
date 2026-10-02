@@ -97,3 +97,20 @@ test('uses official transparent brand logos and an inert text search field', () 
   assert.match(css, /\.order-search:hover/);
   assert.match(css, /\.order-search:focus-visible/);
 });
+
+test('selected order details render in an accessible modal overlay', () => {
+  const markup = html({ orders: mapOrders(orders, restaurants), selectedOrderId: 7 });
+  assert.match(markup, /role="dialog"/);
+  assert.match(markup, /aria-modal="true"/);
+  assert.match(markup, /aria-label="Detalle del pedido"/);
+  assert.match(markup, /Cerrar detalle/);
+  assert.match(markup, /position:fixed/);
+  assert.doesNotMatch(markup, /<aside class="order-detail"/);
+});
+
+test('order modal exposes a close callback without changing the search input', () => {
+  const source = fs.readFileSync('app/javascript/dashboard.jsx', 'utf8');
+  assert.match(source, /onClose/);
+  assert.match(source, /Escape/);
+  assert.match(source, /focus\(/);
+});
