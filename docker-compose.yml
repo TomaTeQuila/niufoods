@@ -1,8 +1,20 @@
+x-app-environment: &app-environment
+  RAILS_ENV: production
+  DATABASE_HOST: postgres
+  DATABASE_PORT: "5432"
+  DATABASE_USER: niufoods
+  DATABASE_PASSWORD: niufoods
+  DATABASE_URL: postgres://niufoods:niufoods@postgres:5432/niufoods_production
+  CACHE_DATABASE_NAME: niufoods_production_cache
+  CABLE_DATABASE_NAME: niufoods_production_cable
+  REDIS_URL: redis://redis:6379/0
+  STORE_API_URL: http://web:80/store_api/v1/orders
+
 services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: niufoods_development
+      POSTGRES_DB: niufoods_production
       POSTGRES_USER: niufoods
       POSTGRES_PASSWORD: niufoods
     ports:
@@ -10,7 +22,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U niufoods -d niufoods_development"]
+      test: ["CMD-SHELL", "pg_isready -U niufoods -d niufoods_production"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -27,6 +39,33 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  web:
+    image: niufoods:local
+    build: .
+    environment: *app-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost/up || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  worker:
+    image: niufoods:local
+    build: .
+    command: ["bundle", "exec", "sidekiq", "-C", "config/sidekiq.yml"]
+    environment: *app-environment
+    depends_on:
+      web:
+        condition: service_healthy
 
 volumes:
   postgres_data:
