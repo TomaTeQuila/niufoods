@@ -122,3 +122,6 @@ El dashboard usa React; su bundle ya está incluido en `public/assets`. Para rec
 - La idempotencia evita duplicar órdenes y jobs cuando se repite una solicitud con la misma clave.
 - Los totales se calculan en el servidor y los precios de los ítems se guardan como snapshots históricos.
 - Los errores HTTP 5xx, throttling y fallos de transporte se reintentan; los errores definitivos 4xx terminan con estado `error`.
+
+## Pendiente
+Me hubiera gustado agregar un modelo de decisiones como Jev, para hacer un buscador inteligente en el dashboard, que uno pudiera buscar por oraciones complejas y no solo por keywords, ej: "Ordenes sobre 50.000, Restaurant Ñuñoa y zona Providencia", pero no se justificaba para este ejercicio.
