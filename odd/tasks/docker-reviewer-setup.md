@@ -26,6 +26,7 @@ Compose currently provides only Postgres and Redis, while the README requires ho
 
 ## Tasks
 - [x] DRS-1: Added web and Sidekiq Compose services and replaced README setup with reviewer-oriented Spanish quick path, seed, simulator, API/Postman/idempotency, verification, and cleanup instructions.
+- [x] DRS-2: Replaced voseo with neutral Latin American Spanish forms throughout the README; preserved commands, API examples, and technical meaning.
 
 ## Progress
 - [x] Read-only exploration confirmed existing Docker, database, worker, simulator, seed, and dashboard behavior.
@@ -37,6 +38,8 @@ Compose currently provides only Postgres and Redis, while the README requires ho
 - [x] Skipped Docker image build/runtime checks; no Docker Hub pull authorization was granted.
 - [x] Updated and read back this task document and its Engram mirror.
 - [x] Work-unit commit `3f3dd46` (`chore(docker): add reviewer compose setup`) on `chore/docker-reviewer-setup`; no push or PR.
+- [x] DRS-2 language correction passed README readback for voseo forms and `git diff --check`.
+- [x] DRS-2 work-unit commit `866d880` (`docs(readme): neutralize Spanish instructions`).
 
 ## Acceptance criteria
 - `docker compose up --build` describes a web/dashboard service and Sidekiq worker backed by Compose Postgres/Redis, with internal dispatch using Compose DNS.
